@@ -1,120 +1,188 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>AI Agent</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Agent Smart Presence</title>
 
-  <style>
-    /* Reset */
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
 
-    html, body {
-      width: 100%;
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-      -webkit-text-size-adjust: 100%;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
+html, body {
+  width:100%;
+  height:100%;
+  background:#000;
+  overflow:hidden;
+  font-family:system-ui;
+}
 
-    /* Safe-area iPhone */
-    body {
-      padding: env(safe-area-inset-top) env(safe-area-inset-right)
-               env(safe-area-inset-bottom) env(safe-area-inset-left);
-    }
+.stage {
+  width:100vw;
+  height:100vh;
+  display:grid;
+  place-items:center;
+}
 
-    /* Contenitore che forza 9:16 e centra */
-    .stage {
-      width: 100vw;
-      height: 100vh;
-      display: grid;
-      place-items: center;
-      background: #000;
-    }
+.frame {
+  width:min(100vw, calc(100vh * 9 / 16));
+  height:min(100vh, calc(100vw * 16 / 9));
+  position:relative;
+}
 
-    /* Box 9:16 "letterbox" se schermo non coincide */
-    .frame {
-      width: min(100vw, calc(100vh * 9 / 16));
-      height: min(100vh, calc(100vw * 16 / 9));
-      background: #000;
-      border: 0;
-      border-radius: 0;
-      overflow: hidden;
-      position: relative;
-    }
+iframe {
+  width:100%;
+  height:100%;
+  border:0;
+}
 
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: 0;
-      background: #000;
-      display: block;
-      /* evita selezioni strane */
-      -webkit-tap-highlight-color: transparent;
-    }
+.loading {
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  color:#fff;
+  background:rgba(0,0,0,0.8);
+  z-index:2;
+}
 
-    /* Overlay di "caricamento" (opzionale) */
-    .loading {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      color: rgba(255,255,255,.85);
-      font-size: 14px;
-      letter-spacing: .2px;
-      user-select: none;
-      pointer-events: none;
-      background: radial-gradient(circle at center, rgba(255,255,255,.06), rgba(0,0,0,.85));
-    }
+/* overlay presenza */
+.presenceOverlay {
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  background:rgba(0,0,0,0.6);
+  z-index:3;
+  font-size:18px;
+  text-align:center;
+  padding:20px;
+  transition:opacity .4s;
+}
 
-    /* Nasconde la scroll-bar su alcuni browser */
-    ::-webkit-scrollbar { width: 0; height: 0; }
-  </style>
+.hidden {
+  opacity:0;
+  pointer-events:none;
+}
+</style>
 </head>
 
 <body>
-  <div class="stage">
-    <div class="frame">
-      <div class="loading" id="loading">Caricamento…</div>
 
-      <iframe
-        id="agentFrame"
-        title="D-ID Agent"
-        allow="camera; microphone; autoplay; clipboard-read; clipboard-write; fullscreen"
-        referrerpolicy="no-referrer"
-        src="https://studio.d-id.com/agents/share?id=v2_agt_TSs3J5qX&utm_source=copy&key=WjI5dloyeGxMVzloZFhSb01ud3hNVGd5TXpZME9EUTNNVFl4T0RBMk5ETTBNams2U2tOSmVteHlOMkZzWW1oRlIxUTNXbXhPTVZSeQ=="
-      ></iframe>
+<div class="stage">
+  <div class="frame">
+
+    <div class="loading" id="loading">Caricamento…</div>
+
+    <div class="presenceOverlay" id="presence">
+      Avvicinati per iniziare<br>
+      L’assistente AI si attiverà automaticamente
     </div>
+
+    <iframe
+      id="agentFrame"
+      allow="camera; microphone; autoplay"
+      src="https://studio.d-id.com/agents/share?id=v2_agt_TSs3J5qX&utm_source=copy"
+    ></iframe>
+
   </div>
+</div>
 
-  <script>
-    // Prova a mandare subito full-screen (funziona se l'utente interagisce: iOS richiede tap)
-    const frame = document.getElementById('agentFrame');
-    const loading = document.getElementById('loading');
+<script>
+const frame = document.getElementById('agentFrame');
+const loading = document.getElementById('loading');
+const overlay = document.getElementById('presence');
 
-    frame.addEventListener('load', () => {
-      if (loading) loading.style.display = 'none';
-    });
+frame.onload = () => loading.style.display = "none";
 
-    // Se vuoi, al primo tap prova a entrare in fullscreen (su iOS spesso resta "pseudo-fullscreen")
-    function requestFs() {
-      const el = document.documentElement;
-      const fs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-      if (fs) { try { fs.call(el); } catch(e) {} }
-      window.removeEventListener('touchstart', requestFs);
-      window.removeEventListener('click', requestFs);
+// ==========================
+// 🎥 PRESENCE DETECTION
+// ==========================
+let video = document.createElement('video');
+let canvas = document.createElement('canvas');
+let ctx = canvas.getContext('2d');
+
+let lastFrame = null;
+let presenceDetected = false;
+
+navigator.mediaDevices.getUserMedia({ video: true })
+.then(stream => {
+  video.srcObject = stream;
+  video.play();
+  detectMotion();
+})
+.catch(err => {
+  console.log("Camera non disponibile", err);
+});
+
+// Motion detection semplice
+function detectMotion() {
+  canvas.width = 160;
+  canvas.height = 120;
+
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  let currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  if (lastFrame) {
+    let diff = 0;
+
+    for (let i = 0; i < currentFrame.data.length; i += 4) {
+      diff += Math.abs(currentFrame.data[i] - lastFrame.data[i]);
     }
-    window.addEventListener('touchstart', requestFs, { once: true, passive: true });
-    window.addEventListener('click', requestFs, { once: true });
 
-    // Blocca gesture zoom doppio tap (più “kiosk-like”)
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', (event) => {
-      const now = Date.now();
-      if (now - lastTouchEnd <= 300) event.preventDefault();
-      lastTouchEnd = now;
-    }, { passive: false });
-  </script>
+    if (diff > 50000 && !presenceDetected) {
+      presenceDetected = true;
+      onPresenceDetected();
+    }
+  }
+
+  lastFrame = currentFrame;
+  requestAnimationFrame(detectMotion);
+}
+
+// ==========================
+// 🚀 ACTION ON PRESENCE
+// ==========================
+function onPresenceDetected() {
+
+  console.log("Presenza rilevata");
+
+  // nascondi overlay
+  overlay.classList.add("hidden");
+
+  // simula interazione utente per sbloccare audio/video
+  document.body.click();
+
+  // prova fullscreen
+  requestFullscreen();
+
+  // OPTIONAL: refresh iframe per auto start sessione
+  // (utile per D-ID che richiede user gesture)
+  setTimeout(() => {
+    frame.contentWindow.postMessage("start", "*");
+  }, 1000);
+}
+
+// ==========================
+// FULLSCREEN
+// ==========================
+function requestFullscreen() {
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen();
+}
+
+// ==========================
+// BLOCCA ZOOM
+// ==========================
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (event) => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) event.preventDefault();
+  lastTouchEnd = now;
+}, { passive:false });
+
+</script>
+
 </body>
 </html>
