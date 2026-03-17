@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>D-ID Agent Stable Start</title>
+  <title>D-ID Agent Auto Start</title>
 
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -15,6 +15,11 @@
       overflow:hidden;
       font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       -webkit-text-size-adjust:100%;
+    }
+
+    body {
+      padding: env(safe-area-inset-top) env(safe-area-inset-right)
+               env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
 
     .stage {
@@ -36,9 +41,9 @@
     #agent-container {
       width:100%;
       height:100%;
-      background:#000;
       position:relative;
       z-index:1;
+      background:#000;
     }
 
     .overlay {
@@ -75,35 +80,6 @@
       border-radius:10px;
       background:rgba(0,0,0,.55);
       backdrop-filter:blur(4px);
-    }
-
-    .startPanel {
-      position:absolute;
-      inset:0;
-      z-index:9;
-      display:none;
-      align-items:center;
-      justify-content:center;
-      background:rgba(0,0,0,.45);
-      padding:24px;
-    }
-
-    .startPanel.show {
-      display:flex;
-    }
-
-    .startBtn {
-      border:0;
-      border-radius:18px;
-      padding:18px 28px;
-      font-size:22px;
-      font-weight:700;
-      background:#ffffff;
-      color:#000;
-      cursor:pointer;
-      min-width:260px;
-      min-height:72px;
-      box-shadow:0 10px 30px rgba(0,0,0,.35);
     }
 
     .cameraBox {
@@ -174,10 +150,6 @@
 
       <div class="status" id="status">Avvio rilevamento presenza…</div>
 
-      <div class="startPanel" id="startPanel">
-        <button class="startBtn" id="startBtn">Inizia conversazione</button>
-      </div>
-
       <div class="cameraBox" id="cameraBox">
         <video id="debugVideo" autoplay playsinline muted></video>
       </div>
@@ -197,8 +169,6 @@
     const cameraLabel = document.getElementById('cameraLabel');
     const canvas = document.getElementById('presenceCanvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const startPanel = document.getElementById('startPanel');
-    const startBtn = document.getElementById('startBtn');
 
     let stream = null;
     let detected = false;
@@ -206,7 +176,7 @@
     let motionInterval = null;
     let lastFrame = null;
     let motionHits = 0;
-    let loadingWatchdog = null;
+    let didLoadTimeout = null;
 
     function setStatus(text) {
       statusBox.textContent = text;
@@ -217,7 +187,7 @@
       const el = document.documentElement;
       const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
       if (fn) {
-        try { fn.call(el); } catch(e) {}
+        try { fn.call(el); } catch (e) {}
       }
     }
 
@@ -226,10 +196,12 @@
         clearInterval(motionInterval);
         motionInterval = null;
       }
+
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
         stream = null;
       }
+
       cam.srcObject = null;
       debugVideo.srcObject = null;
       cameraBox.classList.add('hidden');
@@ -263,7 +235,6 @@
       } catch (err) {
         console.error(err);
         setStatus('Fotocamera non disponibile');
-        showManualStart();
       }
     }
 
@@ -273,6 +244,7 @@
           resolve();
           return;
         }
+
         const done = () => {
           if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
             videoEl.removeEventListener('loadedmetadata', done);
@@ -280,6 +252,7 @@
             resolve();
           }
         };
+
         videoEl.addEventListener('loadedmetadata', done);
         videoEl.addEventListener('canplay', done);
       });
@@ -328,6 +301,42 @@
       }, 250);
     }
 
+    function unlockInteraction() {
+      try {
+        const clickEvent = new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true
+        });
+        document.body.dispatchEvent(clickEvent);
+
+        window.focus();
+
+        const audio = new Audio();
+        audio.muted = true;
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => {});
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.position = 'fixed';
+        btn.style.left = '-9999px';
+        btn.style.top = '-9999px';
+        btn.style.opacity = '0';
+        document.body.appendChild(btn);
+        btn.focus();
+        btn.click();
+        document.body.removeChild(btn);
+
+        document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        document.dispatchEvent(new Event('touchstart', { bubbles: true }));
+      } catch (e) {
+        console.log('unlock error', e);
+      }
+    }
+
     function loadDidSdk() {
       if (sdkLoaded) return;
       sdkLoaded = true;
@@ -345,29 +354,64 @@
       script.setAttribute('data-target-id', 'agent-container');
 
       script.onload = () => {
-        setStatus('Assistente caricato. Tocca per iniziare.');
-        showManualStart();
+        setStatus('Assistente caricato');
+        tryAutoStartDid();
       };
 
       script.onerror = () => {
         setStatus('Errore caricamento D-ID');
-        showManualStart();
       };
 
       document.body.appendChild(script);
 
-      loadingWatchdog = setTimeout(() => {
-        setStatus('Assistente pronto. Tocca per iniziare.');
-        showManualStart();
-      }, 9000);
+      didLoadTimeout = setTimeout(() => {
+        if (statusBox.textContent === 'Caricamento assistente…') {
+          setStatus('Assistente in avvio…');
+          tryAutoStartDid();
+        }
+      }, 8000);
     }
 
-    function showManualStart() {
-      startPanel.classList.add('show');
-    }
+    function tryAutoStartDid() {
+      let tries = 0;
+      const maxTries = 30;
 
-    function hideManualStart() {
-      startPanel.classList.remove('show');
+      const timer = setInterval(() => {
+        tries++;
+
+        const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
+        const startButton = buttons.find(el => {
+          const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
+          return txt.includes('start conversation') ||
+                 txt.includes('start') ||
+                 txt.includes('conversation') ||
+                 txt.includes('inizia conversazione') ||
+                 txt.includes('inizia');
+        });
+
+        if (startButton) {
+          try {
+            startButton.click();
+            setStatus('Conversazione avviata');
+          } catch (e) {
+            console.log('click start failed', e);
+          }
+          clearInterval(timer);
+          return;
+        }
+
+        const agentContainer = document.getElementById('agent-container');
+        if (agentContainer) {
+          try {
+            agentContainer.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          } catch (e) {}
+        }
+
+        if (tries >= maxTries) {
+          clearInterval(timer);
+          setStatus('Assistente pronto');
+        }
+      }, 700);
     }
 
     function onPresenceDetected() {
@@ -379,16 +423,13 @@
 
       cleanupCamera();
 
-      setTimeout(() => {
-        loadDidSdk();
-      }, 500);
-    }
+      unlockInteraction();
 
-    startBtn.addEventListener('click', () => {
-      hideManualStart();
-      requestFs();
-      setStatus('Conversazione avviata');
-    });
+      setTimeout(() => {
+        requestFs();
+        loadDidSdk();
+      }, 300);
+    }
 
     let lastTouchEnd = 0;
     document.addEventListener('touchend', (event) => {
@@ -396,6 +437,9 @@
       if (now - lastTouchEnd <= 300) event.preventDefault();
       lastTouchEnd = now;
     }, { passive: false });
+
+    document.addEventListener('touchstart', unlockInteraction, { once: true, passive: true });
+    document.addEventListener('click', unlockInteraction, { once: true });
 
     startCamera();
   </script>
