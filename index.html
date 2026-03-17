@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>D-ID Auto Presence Stable</title>
+  <title>D-ID Totem Anti-Loading</title>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -51,25 +51,45 @@
       background: #000;
     }
 
-    .overlay {
+    .overlay,
+    .loadingScreen,
+    .fallbackScreen,
+    .expiredScreen {
       position: absolute;
       inset: 0;
-      z-index: 5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      z-index: 10;
+      display: grid;
+      place-items: center;
       text-align: center;
-      color: #fff;
       padding: 24px;
-      background: rgba(0,0,0,.82);
-      font-size: 18px;
-      line-height: 1.45;
-      transition: opacity .35s ease;
+      color: #fff;
+      background: rgba(0,0,0,.84);
+      transition: opacity .3s ease;
     }
 
-    .overlay.hidden {
+    .hidden {
       opacity: 0;
       pointer-events: none;
+    }
+
+    .overlayBox,
+    .loadingBox,
+    .fallbackBox,
+    .expiredBox {
+      max-width: 92%;
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      line-height: 1.45;
+      color: rgba(255,255,255,.92);
     }
 
     .status {
@@ -77,13 +97,13 @@
       left: 12px;
       right: 12px;
       bottom: 12px;
-      z-index: 6;
-      color: rgba(255,255,255,.95);
+      z-index: 12;
+      color: rgba(255,255,255,.96);
       font-size: 13px;
       text-align: center;
       padding: 10px 12px;
       border-radius: 10px;
-      background: rgba(0,0,0,.55);
+      background: rgba(0,0,0,.52);
       backdrop-filter: blur(4px);
     }
 
@@ -91,11 +111,11 @@
       position: absolute;
       top: 12px;
       left: 12px;
-      width: 110px;
-      height: 146px;
+      width: 108px;
+      height: 144px;
       border-radius: 12px;
       overflow: hidden;
-      z-index: 7;
+      z-index: 12;
       background: #111;
       border: 1px solid rgba(255,255,255,.18);
       box-shadow: 0 6px 18px rgba(0,0,0,.35);
@@ -110,15 +130,15 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scaleX(-1);
       display: block;
+      transform: scaleX(-1);
     }
 
     .cameraLabel {
       position: absolute;
       top: 164px;
       left: 12px;
-      z-index: 7;
+      z-index: 12;
       padding: 5px 8px;
       border-radius: 999px;
       background: rgba(0,0,0,.55);
@@ -126,22 +146,31 @@
       font-size: 11px;
     }
 
-    .hardLoading {
-      position: absolute;
-      inset: 0;
-      z-index: 4;
-      display: none;
-      place-items: center;
-      text-align: center;
-      padding: 24px;
-      color: #fff;
-      background: radial-gradient(circle at center, rgba(255,255,255,.06), rgba(0,0,0,.92));
+    .btn {
+      margin-top: 16px;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 20px;
       font-size: 16px;
-      line-height: 1.45;
+      font-weight: 700;
+      background: #fff;
+      color: #000;
+      cursor: pointer;
+      min-width: 220px;
     }
 
-    .hardLoading.show {
-      display: grid;
+    .spinner {
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      border: 4px solid rgba(255,255,255,.18);
+      border-top-color: #fff;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
 
     video#presenceCam,
@@ -151,7 +180,7 @@
       top: -9999px;
       width: 1px;
       height: 1px;
-      opacity: 0.001;
+      opacity: .001;
       pointer-events: none;
     }
 
@@ -166,12 +195,34 @@
       </div>
 
       <div class="overlay" id="overlay">
-        Avvicinati per iniziare<br>
-        L’assistente AI si attiverà automaticamente
+        <div class="overlayBox">
+          <div class="title">Avvicinati per iniziare</div>
+          <div class="subtitle">L’assistente AI si attiverà automaticamente quando rileva una presenza.</div>
+        </div>
       </div>
 
-      <div class="hardLoading" id="hardLoading">
-        Attivazione assistente in corso…
+      <div class="loadingScreen hidden" id="loadingScreen">
+        <div class="loadingBox">
+          <div class="spinner"></div>
+          <div class="title" style="font-size:22px;">Attivazione assistente</div>
+          <div class="subtitle">Sto preparando la sessione. Attendi qualche secondo…</div>
+        </div>
+      </div>
+
+      <div class="fallbackScreen hidden" id="fallbackScreen">
+        <div class="fallbackBox">
+          <div class="title" style="font-size:22px;">Riattivazione sessione</div>
+          <div class="subtitle">L’assistente sta impiegando più tempo del previsto. Sto ripristinando l’esperienza.</div>
+          <button class="btn" id="retryBtn">Riprova ora</button>
+        </div>
+      </div>
+
+      <div class="expiredScreen hidden" id="expiredScreen">
+        <div class="expiredBox">
+          <div class="title" style="font-size:22px;">Sessione terminata</div>
+          <div class="subtitle">Tocca per riavviare l’assistente.</div>
+          <button class="btn" id="restartBtn">Riavvia sessione</button>
+        </div>
       </div>
 
       <div class="status" id="status">Avvio rilevamento presenza…</div>
@@ -187,9 +238,17 @@
   <canvas id="presenceCanvas" width="160" height="120"></canvas>
 
   <script>
+    const CLIENT_KEY = 'Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy';
+    const AGENT_ID = 'v2_agt_TSs3J5qX';
+
     const overlay = document.getElementById('overlay');
-    const hardLoading = document.getElementById('hardLoading');
+    const loadingScreen = document.getElementById('loadingScreen');
+    const fallbackScreen = document.getElementById('fallbackScreen');
+    const expiredScreen = document.getElementById('expiredScreen');
+    const retryBtn = document.getElementById('retryBtn');
+    const restartBtn = document.getElementById('restartBtn');
     const statusBox = document.getElementById('status');
+
     const cam = document.getElementById('presenceCam');
     const debugVideo = document.getElementById('debugVideo');
     const cameraBox = document.getElementById('cameraBox');
@@ -197,19 +256,17 @@
     const canvas = document.getElementById('presenceCanvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-    const CLIENT_KEY = 'Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy';
-    const AGENT_ID = 'v2_agt_TSs3J5qX';
-
-    let stream = null;
-    let detected = false;
+    let presenceStream = null;
     let motionInterval = null;
+    let sessionTimer = null;
+    let sdkScript = null;
     let lastFrame = null;
     let motionHits = 0;
-    let sdkScript = null;
-    let rebuildCount = 0;
-    let bootStarted = false;
-    let watchdog1 = null;
-    let watchdog2 = null;
+    let presenceDetected = false;
+    let booting = false;
+    let retries = 0;
+    let maxRetries = 1;
+    let loadWatchdog = null;
 
     function setStatus(text) {
       statusBox.textContent = text;
@@ -219,19 +276,32 @@
     function requestFs() {
       const el = document.documentElement;
       const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-      if (fn) {
-        try { fn.call(el); } catch (e) {}
-      }
+      if (fn) { try { fn.call(el); } catch(e) {} }
     }
 
-    function cleanupCamera() {
+    function show(el) { el.classList.remove('hidden'); }
+    function hide(el) { el.classList.add('hidden'); }
+
+    function resetAgentContainer() {
+      const root = document.getElementById('agent-root');
+      root.innerHTML = '<div id="agent-container"></div>';
+    }
+
+    function clearSdkScript() {
+      if (sdkScript && sdkScript.parentNode) {
+        sdkScript.parentNode.removeChild(sdkScript);
+      }
+      sdkScript = null;
+    }
+
+    function stopPresenceCamera() {
       if (motionInterval) {
         clearInterval(motionInterval);
         motionInterval = null;
       }
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
+      if (presenceStream) {
+        presenceStream.getTracks().forEach(track => track.stop());
+        presenceStream = null;
       }
       cam.srcObject = null;
       debugVideo.srcObject = null;
@@ -239,11 +309,11 @@
       cameraLabel.classList.add('hidden');
     }
 
-    async function startCamera() {
+    async function startPresenceCamera() {
       try {
         setStatus('Richiesta accesso alla fotocamera…');
 
-        stream = await navigator.mediaDevices.getUserMedia({
+        presenceStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: 'user',
             width: { ideal: 640 },
@@ -253,19 +323,22 @@
           audio: false
         });
 
-        cam.srcObject = stream;
-        debugVideo.srcObject = stream;
+        cam.srcObject = presenceStream;
+        debugVideo.srcObject = presenceStream;
 
         await waitVideoReady(cam);
         await cam.play().catch(() => {});
         await debugVideo.play().catch(() => {});
 
         setStatus('Rilevamento presenza attivo');
-        startMotionDetection();
+        cameraBox.classList.remove('hidden');
+        cameraLabel.classList.remove('hidden');
 
+        startMotionDetection();
       } catch (err) {
         console.error(err);
         setStatus('Fotocamera non disponibile');
+        show(fallbackScreen);
       }
     }
 
@@ -292,7 +365,7 @@
       motionHits = 0;
 
       motionInterval = setInterval(() => {
-        if (detected) return;
+        if (presenceDetected || booting) return;
         if (!cam.videoWidth || cam.readyState < 2) return;
 
         try {
@@ -311,7 +384,7 @@
 
             if (sum > 7000 && changed > 250) {
               motionHits++;
-              setStatus('Presenza in rilevamento…');
+              setStatus('Presenza rilevata in avvicinamento…');
             } else {
               motionHits = Math.max(0, motionHits - 1);
               setStatus('Attendo presenza…');
@@ -319,7 +392,6 @@
 
             if (motionHits >= 2) {
               onPresenceDetected();
-              return;
             }
           }
 
@@ -330,7 +402,7 @@
       }, 250);
     }
 
-    function unlockInteraction() {
+    function unlockContext() {
       try {
         window.focus();
 
@@ -356,28 +428,17 @@
         const p = audio.play();
         if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {
-        console.log('unlock interaction error', e);
+        console.log('unlockContext error', e);
       }
     }
 
-    function resetAgentContainer() {
-      const root = document.getElementById('agent-root');
-      root.innerHTML = '<div id="agent-container"></div>';
-    }
-
-    function removeSdkScript() {
-      if (sdkScript && sdkScript.parentNode) {
-        sdkScript.parentNode.removeChild(sdkScript);
-      }
-      sdkScript = null;
-    }
-
-    function loadDidSdkFresh() {
-      removeSdkScript();
+    function mountDidAgent() {
+      clearSdkScript();
       resetAgentContainer();
 
-      setStatus(rebuildCount === 0 ? 'Caricamento assistente…' : 'Riavvio assistente…');
-      hardLoading.classList.add('show');
+      setStatus(retries === 0 ? 'Caricamento assistente…' : 'Secondo tentativo di avvio…');
+      show(loadingScreen);
+      hide(fallbackScreen);
 
       sdkScript = document.createElement('script');
       sdkScript.type = 'module';
@@ -390,62 +451,110 @@
       sdkScript.setAttribute('data-target-id', 'agent-container');
 
       sdkScript.onload = () => {
-        setStatus('SDK caricato, attendo agente…');
+        setStatus('SDK D-ID caricato');
+        startRenderWatchdog();
       };
 
       sdkScript.onerror = () => {
-        setStatus('Errore caricamento SDK D-ID');
-        hardLoading.classList.remove('show');
+        handleLoadFailure();
       };
 
       document.body.appendChild(sdkScript);
-
-      clearTimeout(watchdog1);
-      clearTimeout(watchdog2);
-
-      watchdog1 = setTimeout(() => {
-        const root = document.getElementById('agent-root');
-        const hasRenderedSomething = root.querySelector('iframe, video, canvas, [data-name], did-agent');
-
-        if (!hasRenderedSomething && rebuildCount < 1) {
-          rebuildCount++;
-          setStatus('Tentativo di riavvio assistente…');
-          loadDidSdkFresh();
-        }
-      }, 7000);
-
-      watchdog2 = setTimeout(() => {
-        hardLoading.classList.remove('show');
-        setStatus('Assistente avviato');
-      }, 12000);
     }
 
-    function bootDid() {
-      if (bootStarted) return;
-      bootStarted = true;
+    function startRenderWatchdog() {
+      clearTimeout(loadWatchdog);
 
-      unlockInteraction();
-      requestFs();
+      loadWatchdog = setTimeout(() => {
+        const agentRoot = document.getElementById('agent-root');
+        const rendered = agentRoot.querySelector('iframe, video, canvas, did-agent, [data-name="did-agent"]');
 
-      setTimeout(() => {
-        loadDidSdkFresh();
-      }, 800);
+        if (rendered) {
+          hide(loadingScreen);
+          setStatus('Assistente pronto');
+          startSessionTimeout();
+          return;
+        }
+
+        handleLoadFailure();
+      }, 9000);
+    }
+
+    function handleLoadFailure() {
+      clearTimeout(loadWatchdog);
+
+      if (retries < maxRetries) {
+        retries++;
+        setStatus('Riavvio assistente…');
+        setTimeout(() => mountDidAgent(), 800);
+        return;
+      }
+
+      hide(loadingScreen);
+      show(fallbackScreen);
+      setStatus('Avvio non completato');
+    }
+
+    function startSessionTimeout() {
+      clearTimeout(sessionTimer);
+      sessionTimer = setTimeout(() => {
+        show(expiredScreen);
+        setStatus('Sessione terminata');
+      }, 5 * 60 * 1000);
     }
 
     function onPresenceDetected() {
-      if (detected) return;
-      detected = true;
+      if (presenceDetected || booting) return;
 
-      overlay.classList.add('hidden');
-      hardLoading.classList.add('show');
-      setStatus('Presenza rilevata');
+      presenceDetected = true;
+      booting = true;
 
-      cleanupCamera();
+      hide(overlay);
+      hide(expiredScreen);
+      hide(fallbackScreen);
+      show(loadingScreen);
+
+      setStatus('Presenza confermata');
+      stopPresenceCamera();
+      unlockContext();
+      requestFs();
 
       setTimeout(() => {
-        bootDid();
-      }, 1200);
+        mountDidAgent();
+      }, 1000);
     }
+
+    function fullReset() {
+      clearTimeout(loadWatchdog);
+      clearTimeout(sessionTimer);
+
+      presenceDetected = false;
+      booting = false;
+      retries = 0;
+      lastFrame = null;
+      motionHits = 0;
+
+      clearSdkScript();
+      resetAgentContainer();
+
+      hide(loadingScreen);
+      hide(fallbackScreen);
+      hide(expiredScreen);
+      show(overlay);
+
+      startPresenceCamera();
+      setStatus('Riavvio sistema…');
+    }
+
+    retryBtn.addEventListener('click', () => {
+      booting = true;
+      retries = 0;
+      mountDidAgent();
+    });
+
+    restartBtn.addEventListener('click', () => {
+      fullReset();
+    });
 
     let lastTouchEnd = 0;
     document.addEventListener('touchend', (event) => {
@@ -454,10 +563,10 @@
       lastTouchEnd = now;
     }, { passive: false });
 
-    document.addEventListener('touchstart', unlockInteraction, { once: true, passive: true });
-    document.addEventListener('click', unlockInteraction, { once: true });
+    document.addEventListener('touchstart', unlockContext, { once: true, passive: true });
+    document.addEventListener('click', unlockContext, { once: true });
 
-    startCamera();
+    startPresenceCamera();
   </script>
 </body>
 </html>
