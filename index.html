@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>D-ID Agent Auto Start</title>
+  <title>D-ID Auto Presence Stable</title>
 
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
-      width:100%;
-      height:100%;
-      background:#000;
-      overflow:hidden;
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      -webkit-text-size-adjust:100%;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
     }
 
     body {
@@ -23,129 +23,155 @@
     }
 
     .stage {
-      width:100vw;
-      height:100vh;
-      display:grid;
-      place-items:center;
-      background:#000;
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #000;
     }
 
     .frame {
-      width:min(100vw, calc(100vh * 9 / 16));
-      height:min(100vh, calc(100vw * 16 / 9));
-      position:relative;
-      overflow:hidden;
-      background:#000;
+      width: min(100vw, calc(100vh * 9 / 16));
+      height: min(100vh, calc(100vw * 16 / 9));
+      position: relative;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #agent-root {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      z-index: 1;
     }
 
     #agent-container {
-      width:100%;
-      height:100%;
-      position:relative;
-      z-index:1;
-      background:#000;
+      width: 100%;
+      height: 100%;
+      background: #000;
     }
 
     .overlay {
-      position:absolute;
-      inset:0;
-      z-index:5;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      color:#fff;
-      padding:24px;
-      background:rgba(0,0,0,.82);
-      font-size:18px;
-      line-height:1.45;
-      transition:opacity .35s ease;
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: #fff;
+      padding: 24px;
+      background: rgba(0,0,0,.82);
+      font-size: 18px;
+      line-height: 1.45;
+      transition: opacity .35s ease;
     }
 
     .overlay.hidden {
-      opacity:0;
-      pointer-events:none;
+      opacity: 0;
+      pointer-events: none;
     }
 
     .status {
-      position:absolute;
-      left:12px;
-      right:12px;
-      bottom:12px;
-      z-index:6;
-      color:rgba(255,255,255,.95);
-      font-size:13px;
-      text-align:center;
-      padding:10px 12px;
-      border-radius:10px;
-      background:rgba(0,0,0,.55);
-      backdrop-filter:blur(4px);
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 6;
+      color: rgba(255,255,255,.95);
+      font-size: 13px;
+      text-align: center;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(4px);
     }
 
     .cameraBox {
-      position:absolute;
-      top:12px;
-      left:12px;
-      width:110px;
-      height:146px;
-      border-radius:12px;
-      overflow:hidden;
-      z-index:7;
-      background:#111;
-      border:1px solid rgba(255,255,255,.18);
-      box-shadow:0 6px 18px rgba(0,0,0,.35);
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 110px;
+      height: 146px;
+      border-radius: 12px;
+      overflow: hidden;
+      z-index: 7;
+      background: #111;
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: 0 6px 18px rgba(0,0,0,.35);
     }
 
-    .cameraBox.hidden {
-      display:none;
+    .cameraBox.hidden,
+    .cameraLabel.hidden {
+      display: none;
     }
 
     #debugVideo {
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      transform:scaleX(-1);
-      display:block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      display: block;
     }
 
     .cameraLabel {
-      position:absolute;
-      top:164px;
-      left:12px;
-      z-index:7;
-      padding:5px 8px;
-      border-radius:999px;
-      background:rgba(0,0,0,.55);
-      color:#fff;
-      font-size:11px;
+      position: absolute;
+      top: 164px;
+      left: 12px;
+      z-index: 7;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.55);
+      color: #fff;
+      font-size: 11px;
     }
 
-    .cameraLabel.hidden {
-      display:none;
+    .hardLoading {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      display: none;
+      place-items: center;
+      text-align: center;
+      padding: 24px;
+      color: #fff;
+      background: radial-gradient(circle at center, rgba(255,255,255,.06), rgba(0,0,0,.92));
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .hardLoading.show {
+      display: grid;
     }
 
     video#presenceCam,
     canvas#presenceCanvas {
-      position:fixed;
-      left:-9999px;
-      top:-9999px;
-      width:1px;
-      height:1px;
-      opacity:0.001;
-      pointer-events:none;
+      position: fixed;
+      left: -9999px;
+      top: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0.001;
+      pointer-events: none;
     }
 
-    ::-webkit-scrollbar { width:0; height:0; }
+    ::-webkit-scrollbar { width: 0; height: 0; }
   </style>
 </head>
 <body>
   <div class="stage">
     <div class="frame">
-      <div id="agent-container"></div>
+      <div id="agent-root">
+        <div id="agent-container"></div>
+      </div>
 
       <div class="overlay" id="overlay">
         Avvicinati per iniziare<br>
         L’assistente AI si attiverà automaticamente
+      </div>
+
+      <div class="hardLoading" id="hardLoading">
+        Attivazione assistente in corso…
       </div>
 
       <div class="status" id="status">Avvio rilevamento presenza…</div>
@@ -162,6 +188,7 @@
 
   <script>
     const overlay = document.getElementById('overlay');
+    const hardLoading = document.getElementById('hardLoading');
     const statusBox = document.getElementById('status');
     const cam = document.getElementById('presenceCam');
     const debugVideo = document.getElementById('debugVideo');
@@ -170,13 +197,19 @@
     const canvas = document.getElementById('presenceCanvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+    const CLIENT_KEY = 'Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy';
+    const AGENT_ID = 'v2_agt_TSs3J5qX';
+
     let stream = null;
     let detected = false;
-    let sdkLoaded = false;
     let motionInterval = null;
     let lastFrame = null;
     let motionHits = 0;
-    let didLoadTimeout = null;
+    let sdkScript = null;
+    let rebuildCount = 0;
+    let bootStarted = false;
+    let watchdog1 = null;
+    let watchdog2 = null;
 
     function setStatus(text) {
       statusBox.textContent = text;
@@ -196,12 +229,10 @@
         clearInterval(motionInterval);
         motionInterval = null;
       }
-
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
         stream = null;
       }
-
       cam.srcObject = null;
       debugVideo.srcObject = null;
       cameraBox.classList.add('hidden');
@@ -230,7 +261,7 @@
         await debugVideo.play().catch(() => {});
 
         setStatus('Rilevamento presenza attivo');
-        startAggressiveMotionDetection();
+        startMotionDetection();
 
       } catch (err) {
         console.error(err);
@@ -244,7 +275,6 @@
           resolve();
           return;
         }
-
         const done = () => {
           if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
             videoEl.removeEventListener('loadedmetadata', done);
@@ -252,13 +282,12 @@
             resolve();
           }
         };
-
         videoEl.addEventListener('loadedmetadata', done);
         videoEl.addEventListener('canplay', done);
       });
     }
 
-    function startAggressiveMotionDetection() {
+    function startMotionDetection() {
       lastFrame = null;
       motionHits = 0;
 
@@ -303,21 +332,7 @@
 
     function unlockInteraction() {
       try {
-        const clickEvent = new MouseEvent('click', {
-          view: window,
-          bubbles: true,
-          cancelable: true
-        });
-        document.body.dispatchEvent(clickEvent);
-
         window.focus();
-
-        const audio = new Audio();
-        audio.muted = true;
-        const playPromise = audio.play();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch(() => {});
-        }
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -330,105 +345,106 @@
         btn.click();
         document.body.removeChild(btn);
 
-        document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-        document.dispatchEvent(new Event('touchstart', { bubbles: true }));
+        document.body.dispatchEvent(new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true
+        }));
+
+        const audio = new Audio();
+        audio.muted = true;
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
       } catch (e) {
-        console.log('unlock error', e);
+        console.log('unlock interaction error', e);
       }
     }
 
-    function loadDidSdk() {
-      if (sdkLoaded) return;
-      sdkLoaded = true;
-
-      setStatus('Caricamento assistente…');
-
-      const script = document.createElement('script');
-      script.type = 'module';
-      script.src = 'https://agent.d-id.com/v2/index.js';
-      script.setAttribute('data-mode', 'full');
-      script.setAttribute('data-client-key', 'Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy');
-      script.setAttribute('data-agent-id', 'v2_agt_TSs3J5qX');
-      script.setAttribute('data-name', 'did-agent');
-      script.setAttribute('data-monitor', 'false');
-      script.setAttribute('data-target-id', 'agent-container');
-
-      script.onload = () => {
-        setStatus('Assistente caricato');
-        tryAutoStartDid();
-      };
-
-      script.onerror = () => {
-        setStatus('Errore caricamento D-ID');
-      };
-
-      document.body.appendChild(script);
-
-      didLoadTimeout = setTimeout(() => {
-        if (statusBox.textContent === 'Caricamento assistente…') {
-          setStatus('Assistente in avvio…');
-          tryAutoStartDid();
-        }
-      }, 8000);
+    function resetAgentContainer() {
+      const root = document.getElementById('agent-root');
+      root.innerHTML = '<div id="agent-container"></div>';
     }
 
-    function tryAutoStartDid() {
-      let tries = 0;
-      const maxTries = 30;
+    function removeSdkScript() {
+      if (sdkScript && sdkScript.parentNode) {
+        sdkScript.parentNode.removeChild(sdkScript);
+      }
+      sdkScript = null;
+    }
 
-      const timer = setInterval(() => {
-        tries++;
+    function loadDidSdkFresh() {
+      removeSdkScript();
+      resetAgentContainer();
 
-        const buttons = Array.from(document.querySelectorAll('button, [role="button"]'));
-        const startButton = buttons.find(el => {
-          const txt = (el.innerText || el.textContent || '').trim().toLowerCase();
-          return txt.includes('start conversation') ||
-                 txt.includes('start') ||
-                 txt.includes('conversation') ||
-                 txt.includes('inizia conversazione') ||
-                 txt.includes('inizia');
-        });
+      setStatus(rebuildCount === 0 ? 'Caricamento assistente…' : 'Riavvio assistente…');
+      hardLoading.classList.add('show');
 
-        if (startButton) {
-          try {
-            startButton.click();
-            setStatus('Conversazione avviata');
-          } catch (e) {
-            console.log('click start failed', e);
-          }
-          clearInterval(timer);
-          return;
+      sdkScript = document.createElement('script');
+      sdkScript.type = 'module';
+      sdkScript.src = 'https://agent.d-id.com/v2/index.js';
+      sdkScript.setAttribute('data-mode', 'full');
+      sdkScript.setAttribute('data-client-key', CLIENT_KEY);
+      sdkScript.setAttribute('data-agent-id', AGENT_ID);
+      sdkScript.setAttribute('data-name', 'did-agent');
+      sdkScript.setAttribute('data-monitor', 'false');
+      sdkScript.setAttribute('data-target-id', 'agent-container');
+
+      sdkScript.onload = () => {
+        setStatus('SDK caricato, attendo agente…');
+      };
+
+      sdkScript.onerror = () => {
+        setStatus('Errore caricamento SDK D-ID');
+        hardLoading.classList.remove('show');
+      };
+
+      document.body.appendChild(sdkScript);
+
+      clearTimeout(watchdog1);
+      clearTimeout(watchdog2);
+
+      watchdog1 = setTimeout(() => {
+        const root = document.getElementById('agent-root');
+        const hasRenderedSomething = root.querySelector('iframe, video, canvas, [data-name], did-agent');
+
+        if (!hasRenderedSomething && rebuildCount < 1) {
+          rebuildCount++;
+          setStatus('Tentativo di riavvio assistente…');
+          loadDidSdkFresh();
         }
+      }, 7000);
 
-        const agentContainer = document.getElementById('agent-container');
-        if (agentContainer) {
-          try {
-            agentContainer.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-          } catch (e) {}
-        }
+      watchdog2 = setTimeout(() => {
+        hardLoading.classList.remove('show');
+        setStatus('Assistente avviato');
+      }, 12000);
+    }
 
-        if (tries >= maxTries) {
-          clearInterval(timer);
-          setStatus('Assistente pronto');
-        }
-      }, 700);
+    function bootDid() {
+      if (bootStarted) return;
+      bootStarted = true;
+
+      unlockInteraction();
+      requestFs();
+
+      setTimeout(() => {
+        loadDidSdkFresh();
+      }, 800);
     }
 
     function onPresenceDetected() {
       if (detected) return;
       detected = true;
 
-      setStatus('Presenza rilevata');
       overlay.classList.add('hidden');
+      hardLoading.classList.add('show');
+      setStatus('Presenza rilevata');
 
       cleanupCamera();
 
-      unlockInteraction();
-
       setTimeout(() => {
-        requestFs();
-        loadDidSdk();
-      }, 300);
+        bootDid();
+      }, 1200);
     }
 
     let lastTouchEnd = 0;
