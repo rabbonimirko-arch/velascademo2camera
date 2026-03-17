@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>D-ID Agent Face Presence</title>
+  <title>D-ID Agent Stable Start</title>
 
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -77,24 +77,33 @@
       backdrop-filter:blur(4px);
     }
 
-    .tapStart {
+    .startPanel {
       position:absolute;
       inset:0;
-      z-index:8;
+      z-index:9;
       display:none;
       align-items:center;
       justify-content:center;
-      text-align:center;
-      color:#fff;
+      background:rgba(0,0,0,.45);
       padding:24px;
-      background:rgba(0,0,0,.86);
-      font-size:22px;
-      line-height:1.4;
-      cursor:pointer;
     }
 
-    .tapStart.show {
+    .startPanel.show {
       display:flex;
+    }
+
+    .startBtn {
+      border:0;
+      border-radius:18px;
+      padding:18px 28px;
+      font-size:22px;
+      font-weight:700;
+      background:#ffffff;
+      color:#000;
+      cursor:pointer;
+      min-width:260px;
+      min-height:72px;
+      box-shadow:0 10px 30px rgba(0,0,0,.35);
     }
 
     .cameraBox {
@@ -165,8 +174,8 @@
 
       <div class="status" id="status">Avvio rilevamento presenza…</div>
 
-      <div class="tapStart" id="tapStart">
-        Tocca per avviare l’assistente
+      <div class="startPanel" id="startPanel">
+        <button class="startBtn" id="startBtn">Inizia conversazione</button>
       </div>
 
       <div class="cameraBox" id="cameraBox">
@@ -182,22 +191,22 @@
   <script>
     const overlay = document.getElementById('overlay');
     const statusBox = document.getElementById('status');
-    const tapStart = document.getElementById('tapStart');
     const cam = document.getElementById('presenceCam');
     const debugVideo = document.getElementById('debugVideo');
     const cameraBox = document.getElementById('cameraBox');
     const cameraLabel = document.getElementById('cameraLabel');
     const canvas = document.getElementById('presenceCanvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const startPanel = document.getElementById('startPanel');
+    const startBtn = document.getElementById('startBtn');
 
     let stream = null;
     let detected = false;
-    let agentLoaded = false;
+    let sdkLoaded = false;
     let motionInterval = null;
-    let faceInterval = null;
     let lastFrame = null;
     let motionHits = 0;
-    let faceHits = 0;
+    let loadingWatchdog = null;
 
     function setStatus(text) {
       statusBox.textContent = text;
@@ -216,10 +225,6 @@
       if (motionInterval) {
         clearInterval(motionInterval);
         motionInterval = null;
-      }
-      if (faceInterval) {
-        clearInterval(faceInterval);
-        faceInterval = null;
       }
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -252,19 +257,13 @@
         await cam.play().catch(() => {});
         await debugVideo.play().catch(() => {});
 
-        setStatus('Camera pronta. Ricerca volto…');
-
-        if ('FaceDetector' in window) {
-          startFaceDetection();
-        } else {
-          setStatus('Face detection non supportato. Uso rilevamento movimento avanzato…');
-          startAggressiveMotionDetection();
-        }
+        setStatus('Rilevamento presenza attivo');
+        startAggressiveMotionDetection();
 
       } catch (err) {
         console.error(err);
-        setStatus('Fotocamera non disponibile. Tocca per avviare.');
-        tapStart.classList.add('show');
+        setStatus('Fotocamera non disponibile');
+        showManualStart();
       }
     }
 
@@ -284,45 +283,6 @@
         videoEl.addEventListener('loadedmetadata', done);
         videoEl.addEventListener('canplay', done);
       });
-    }
-
-    function startFaceDetection() {
-      let detector;
-      try {
-        detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-      } catch (e) {
-        setStatus('Face detector non inizializzabile. Uso motion fallback…');
-        startAggressiveMotionDetection();
-        return;
-      }
-
-      faceHits = 0;
-
-      faceInterval = setInterval(async () => {
-        if (detected) return;
-        if (!cam.videoWidth || cam.readyState < 2) return;
-
-        try {
-          const faces = await detector.detect(cam);
-
-          if (faces && faces.length > 0) {
-            faceHits++;
-            setStatus('Volto rilevato…');
-          } else {
-            faceHits = Math.max(0, faceHits - 1);
-            setStatus('Ricerca volto…');
-          }
-
-          if (faceHits >= 2) {
-            onPresenceDetected();
-          }
-        } catch (err) {
-          console.warn('Errore FaceDetector:', err);
-          clearInterval(faceInterval);
-          faceInterval = null;
-          startAggressiveMotionDetection();
-        }
-      }, 500);
     }
 
     function startAggressiveMotionDetection() {
@@ -368,9 +328,9 @@
       }, 250);
     }
 
-    function loadDidAgent() {
-      if (agentLoaded) return;
-      agentLoaded = true;
+    function loadDidSdk() {
+      if (sdkLoaded) return;
+      sdkLoaded = true;
 
       setStatus('Caricamento assistente…');
 
@@ -385,15 +345,29 @@
       script.setAttribute('data-target-id', 'agent-container');
 
       script.onload = () => {
-        setStatus('Assistente pronto');
+        setStatus('Assistente caricato. Tocca per iniziare.');
+        showManualStart();
       };
 
       script.onerror = () => {
         setStatus('Errore caricamento D-ID');
-        tapStart.classList.add('show');
+        showManualStart();
       };
 
       document.body.appendChild(script);
+
+      loadingWatchdog = setTimeout(() => {
+        setStatus('Assistente pronto. Tocca per iniziare.');
+        showManualStart();
+      }, 9000);
+    }
+
+    function showManualStart() {
+      startPanel.classList.add('show');
+    }
+
+    function hideManualStart() {
+      startPanel.classList.remove('show');
     }
 
     function onPresenceDetected() {
@@ -406,17 +380,14 @@
       cleanupCamera();
 
       setTimeout(() => {
-        requestFs();
-        loadDidAgent();
-      }, 600);
+        loadDidSdk();
+      }, 500);
     }
 
-    tapStart.addEventListener('click', () => {
-      overlay.classList.add('hidden');
-      tapStart.classList.remove('show');
-      cleanupCamera();
+    startBtn.addEventListener('click', () => {
+      hideManualStart();
       requestFs();
-      loadDidAgent();
+      setStatus('Conversazione avviata');
     });
 
     let lastTouchEnd = 0;
