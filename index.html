@@ -3,25 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>D-ID Totem Anti-Loading</title>
-
+  <title>D-ID Test Ufficiale</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%;
       height: 100%;
       background: #000;
       overflow: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      -webkit-text-size-adjust: 100%;
+      font-family: Arial, sans-serif;
     }
-
-    body {
-      padding: env(safe-area-inset-top) env(safe-area-inset-right)
-               env(safe-area-inset-bottom) env(safe-area-inset-left);
-    }
-
     .stage {
       width: 100vw;
       height: 100vh;
@@ -29,7 +20,6 @@
       place-items: center;
       background: #000;
     }
-
     .frame {
       width: min(100vw, calc(100vh * 9 / 16));
       height: min(100vh, calc(100vw * 16 / 9));
@@ -37,536 +27,42 @@
       overflow: hidden;
       background: #000;
     }
-
-    #agent-root {
-      position: absolute;
-      inset: 0;
-      background: #000;
-      z-index: 1;
-    }
-
-    #agent-container {
+    #did-agent {
       width: 100%;
       height: 100%;
-      background: #000;
     }
-
-    .overlay,
-    .loadingScreen,
-    .fallbackScreen,
-    .expiredScreen {
-      position: absolute;
-      inset: 0;
-      z-index: 10;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      padding: 24px;
-      color: #fff;
-      background: rgba(0,0,0,.84);
-      transition: opacity .3s ease;
-    }
-
-    .hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .overlayBox,
-    .loadingBox,
-    .fallbackBox,
-    .expiredBox {
-      max-width: 92%;
-    }
-
-    .title {
-      font-size: 28px;
-      font-weight: 700;
-      line-height: 1.2;
-      margin-bottom: 12px;
-    }
-
-    .subtitle {
-      font-size: 16px;
-      line-height: 1.45;
-      color: rgba(255,255,255,.92);
-    }
-
-    .status {
+    .label {
       position: absolute;
       left: 12px;
       right: 12px;
       bottom: 12px;
-      z-index: 12;
-      color: rgba(255,255,255,.96);
-      font-size: 13px;
-      text-align: center;
+      z-index: 20;
+      color: #fff;
+      background: rgba(0,0,0,.55);
       padding: 10px 12px;
       border-radius: 10px;
-      background: rgba(0,0,0,.52);
-      backdrop-filter: blur(4px);
+      text-align: center;
+      font-size: 13px;
     }
-
-    .cameraBox {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      width: 108px;
-      height: 144px;
-      border-radius: 12px;
-      overflow: hidden;
-      z-index: 12;
-      background: #111;
-      border: 1px solid rgba(255,255,255,.18);
-      box-shadow: 0 6px 18px rgba(0,0,0,.35);
-    }
-
-    .cameraBox.hidden,
-    .cameraLabel.hidden {
-      display: none;
-    }
-
-    #debugVideo {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-      transform: scaleX(-1);
-    }
-
-    .cameraLabel {
-      position: absolute;
-      top: 164px;
-      left: 12px;
-      z-index: 12;
-      padding: 5px 8px;
-      border-radius: 999px;
-      background: rgba(0,0,0,.55);
-      color: #fff;
-      font-size: 11px;
-    }
-
-    .btn {
-      margin-top: 16px;
-      border: 0;
-      border-radius: 14px;
-      padding: 14px 20px;
-      font-size: 16px;
-      font-weight: 700;
-      background: #fff;
-      color: #000;
-      cursor: pointer;
-      min-width: 220px;
-    }
-
-    .spinner {
-      width: 44px;
-      height: 44px;
-      margin: 0 auto 16px;
-      border-radius: 50%;
-      border: 4px solid rgba(255,255,255,.18);
-      border-top-color: #fff;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    video#presenceCam,
-    canvas#presenceCanvas {
-      position: fixed;
-      left: -9999px;
-      top: -9999px;
-      width: 1px;
-      height: 1px;
-      opacity: .001;
-      pointer-events: none;
-    }
-
-    ::-webkit-scrollbar { width: 0; height: 0; }
   </style>
 </head>
 <body>
   <div class="stage">
     <div class="frame">
-      <div id="agent-root">
-        <div id="agent-container"></div>
-      </div>
-
-      <div class="overlay" id="overlay">
-        <div class="overlayBox">
-          <div class="title">Avvicinati per iniziare</div>
-          <div class="subtitle">L’assistente AI si attiverà automaticamente quando rileva una presenza.</div>
-        </div>
-      </div>
-
-      <div class="loadingScreen hidden" id="loadingScreen">
-        <div class="loadingBox">
-          <div class="spinner"></div>
-          <div class="title" style="font-size:22px;">Attivazione assistente</div>
-          <div class="subtitle">Sto preparando la sessione. Attendi qualche secondo…</div>
-        </div>
-      </div>
-
-      <div class="fallbackScreen hidden" id="fallbackScreen">
-        <div class="fallbackBox">
-          <div class="title" style="font-size:22px;">Riattivazione sessione</div>
-          <div class="subtitle">L’assistente sta impiegando più tempo del previsto. Sto ripristinando l’esperienza.</div>
-          <button class="btn" id="retryBtn">Riprova ora</button>
-        </div>
-      </div>
-
-      <div class="expiredScreen hidden" id="expiredScreen">
-        <div class="expiredBox">
-          <div class="title" style="font-size:22px;">Sessione terminata</div>
-          <div class="subtitle">Tocca per riavviare l’assistente.</div>
-          <button class="btn" id="restartBtn">Riavvia sessione</button>
-        </div>
-      </div>
-
-      <div class="status" id="status">Avvio rilevamento presenza…</div>
-
-      <div class="cameraBox" id="cameraBox">
-        <video id="debugVideo" autoplay playsinline muted></video>
-      </div>
-      <div class="cameraLabel" id="cameraLabel">Camera attiva</div>
+      <div id="did-agent"></div>
+      <div class="label">Test embed ufficiale D-ID</div>
     </div>
   </div>
 
-  <video id="presenceCam" autoplay playsinline muted></video>
-  <canvas id="presenceCanvas" width="160" height="120"></canvas>
-
-  <script>
-    const CLIENT_KEY = 'Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy';
-    const AGENT_ID = 'v2_agt_TSs3J5qX';
-
-    const overlay = document.getElementById('overlay');
-    const loadingScreen = document.getElementById('loadingScreen');
-    const fallbackScreen = document.getElementById('fallbackScreen');
-    const expiredScreen = document.getElementById('expiredScreen');
-    const retryBtn = document.getElementById('retryBtn');
-    const restartBtn = document.getElementById('restartBtn');
-    const statusBox = document.getElementById('status');
-
-    const cam = document.getElementById('presenceCam');
-    const debugVideo = document.getElementById('debugVideo');
-    const cameraBox = document.getElementById('cameraBox');
-    const cameraLabel = document.getElementById('cameraLabel');
-    const canvas = document.getElementById('presenceCanvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    let presenceStream = null;
-    let motionInterval = null;
-    let sessionTimer = null;
-    let sdkScript = null;
-    let lastFrame = null;
-    let motionHits = 0;
-    let presenceDetected = false;
-    let booting = false;
-    let retries = 0;
-    let maxRetries = 1;
-    let loadWatchdog = null;
-
-    function setStatus(text) {
-      statusBox.textContent = text;
-      console.log(text);
-    }
-
-    function requestFs() {
-      const el = document.documentElement;
-      const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-      if (fn) { try { fn.call(el); } catch(e) {} }
-    }
-
-    function show(el) { el.classList.remove('hidden'); }
-    function hide(el) { el.classList.add('hidden'); }
-
-    function resetAgentContainer() {
-      const root = document.getElementById('agent-root');
-      root.innerHTML = '<div id="agent-container"></div>';
-    }
-
-    function clearSdkScript() {
-      if (sdkScript && sdkScript.parentNode) {
-        sdkScript.parentNode.removeChild(sdkScript);
-      }
-      sdkScript = null;
-    }
-
-    function stopPresenceCamera() {
-      if (motionInterval) {
-        clearInterval(motionInterval);
-        motionInterval = null;
-      }
-      if (presenceStream) {
-        presenceStream.getTracks().forEach(track => track.stop());
-        presenceStream = null;
-      }
-      cam.srcObject = null;
-      debugVideo.srcObject = null;
-      cameraBox.classList.add('hidden');
-      cameraLabel.classList.add('hidden');
-    }
-
-    async function startPresenceCamera() {
-      try {
-        setStatus('Richiesta accesso alla fotocamera…');
-
-        presenceStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'user',
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            frameRate: { ideal: 15, max: 20 }
-          },
-          audio: false
-        });
-
-        cam.srcObject = presenceStream;
-        debugVideo.srcObject = presenceStream;
-
-        await waitVideoReady(cam);
-        await cam.play().catch(() => {});
-        await debugVideo.play().catch(() => {});
-
-        setStatus('Rilevamento presenza attivo');
-        cameraBox.classList.remove('hidden');
-        cameraLabel.classList.remove('hidden');
-
-        startMotionDetection();
-      } catch (err) {
-        console.error(err);
-        setStatus('Fotocamera non disponibile');
-        show(fallbackScreen);
-      }
-    }
-
-    function waitVideoReady(videoEl) {
-      return new Promise((resolve) => {
-        if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
-          resolve();
-          return;
-        }
-        const done = () => {
-          if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-            videoEl.removeEventListener('loadedmetadata', done);
-            videoEl.removeEventListener('canplay', done);
-            resolve();
-          }
-        };
-        videoEl.addEventListener('loadedmetadata', done);
-        videoEl.addEventListener('canplay', done);
-      });
-    }
-
-    function startMotionDetection() {
-      lastFrame = null;
-      motionHits = 0;
-
-      motionInterval = setInterval(() => {
-        if (presenceDetected || booting) return;
-        if (!cam.videoWidth || cam.readyState < 2) return;
-
-        try {
-          ctx.drawImage(cam, 0, 0, canvas.width, canvas.height);
-          const frame = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-
-          if (lastFrame) {
-            let changed = 0;
-            let sum = 0;
-
-            for (let i = 0; i < frame.length; i += 8) {
-              const d = Math.abs(frame[i] - lastFrame[i]);
-              sum += d;
-              if (d > 12) changed++;
-            }
-
-            if (sum > 7000 && changed > 250) {
-              motionHits++;
-              setStatus('Presenza rilevata in avvicinamento…');
-            } else {
-              motionHits = Math.max(0, motionHits - 1);
-              setStatus('Attendo presenza…');
-            }
-
-            if (motionHits >= 2) {
-              onPresenceDetected();
-            }
-          }
-
-          lastFrame = new Uint8ClampedArray(frame);
-        } catch (e) {
-          console.warn('Errore motion detection:', e);
-        }
-      }, 250);
-    }
-
-    function unlockContext() {
-      try {
-        window.focus();
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.style.position = 'fixed';
-        btn.style.left = '-9999px';
-        btn.style.top = '-9999px';
-        btn.style.opacity = '0';
-        document.body.appendChild(btn);
-        btn.focus();
-        btn.click();
-        document.body.removeChild(btn);
-
-        document.body.dispatchEvent(new MouseEvent('click', {
-          view: window,
-          bubbles: true,
-          cancelable: true
-        }));
-
-        const audio = new Audio();
-        audio.muted = true;
-        const p = audio.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
-      } catch (e) {
-        console.log('unlockContext error', e);
-      }
-    }
-
-    function mountDidAgent() {
-      clearSdkScript();
-      resetAgentContainer();
-
-      setStatus(retries === 0 ? 'Caricamento assistente…' : 'Secondo tentativo di avvio…');
-      show(loadingScreen);
-      hide(fallbackScreen);
-
-      sdkScript = document.createElement('script');
-      sdkScript.type = 'module';
-      sdkScript.src = 'https://agent.d-id.com/v2/index.js';
-      sdkScript.setAttribute('data-mode', 'full');
-      sdkScript.setAttribute('data-client-key', CLIENT_KEY);
-      sdkScript.setAttribute('data-agent-id', AGENT_ID);
-      sdkScript.setAttribute('data-name', 'did-agent');
-      sdkScript.setAttribute('data-monitor', 'false');
-      sdkScript.setAttribute('data-target-id', 'agent-container');
-
-      sdkScript.onload = () => {
-        setStatus('SDK D-ID caricato');
-        startRenderWatchdog();
-      };
-
-      sdkScript.onerror = () => {
-        handleLoadFailure();
-      };
-
-      document.body.appendChild(sdkScript);
-    }
-
-    function startRenderWatchdog() {
-      clearTimeout(loadWatchdog);
-
-      loadWatchdog = setTimeout(() => {
-        const agentRoot = document.getElementById('agent-root');
-        const rendered = agentRoot.querySelector('iframe, video, canvas, did-agent, [data-name="did-agent"]');
-
-        if (rendered) {
-          hide(loadingScreen);
-          setStatus('Assistente pronto');
-          startSessionTimeout();
-          return;
-        }
-
-        handleLoadFailure();
-      }, 9000);
-    }
-
-    function handleLoadFailure() {
-      clearTimeout(loadWatchdog);
-
-      if (retries < maxRetries) {
-        retries++;
-        setStatus('Riavvio assistente…');
-        setTimeout(() => mountDidAgent(), 800);
-        return;
-      }
-
-      hide(loadingScreen);
-      show(fallbackScreen);
-      setStatus('Avvio non completato');
-    }
-
-    function startSessionTimeout() {
-      clearTimeout(sessionTimer);
-      sessionTimer = setTimeout(() => {
-        show(expiredScreen);
-        setStatus('Sessione terminata');
-      }, 5 * 60 * 1000);
-    }
-
-    function onPresenceDetected() {
-      if (presenceDetected || booting) return;
-
-      presenceDetected = true;
-      booting = true;
-
-      hide(overlay);
-      hide(expiredScreen);
-      hide(fallbackScreen);
-      show(loadingScreen);
-
-      setStatus('Presenza confermata');
-      stopPresenceCamera();
-      unlockContext();
-      requestFs();
-
-      setTimeout(() => {
-        mountDidAgent();
-      }, 1000);
-    }
-
-    function fullReset() {
-      clearTimeout(loadWatchdog);
-      clearTimeout(sessionTimer);
-
-      presenceDetected = false;
-      booting = false;
-      retries = 0;
-      lastFrame = null;
-      motionHits = 0;
-
-      clearSdkScript();
-      resetAgentContainer();
-
-      hide(loadingScreen);
-      hide(fallbackScreen);
-      hide(expiredScreen);
-      show(overlay);
-
-      startPresenceCamera();
-      setStatus('Riavvio sistema…');
-    }
-
-    retryBtn.addEventListener('click', () => {
-      booting = true;
-      retries = 0;
-      mountDidAgent();
-    });
-
-    restartBtn.addEventListener('click', () => {
-      fullReset();
-    });
-
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', (event) => {
-      const now = Date.now();
-      if (now - lastTouchEnd <= 300) event.preventDefault();
-      lastTouchEnd = now;
-    }, { passive: false });
-
-    document.addEventListener('touchstart', unlockContext, { once: true, passive: true });
-    document.addEventListener('click', unlockContext, { once: true });
-
-    startPresenceCamera();
+  <script
+    type="module"
+    src="https://agent.d-id.com/v2/index.js"
+    data-mode="full"
+    data-client-key="Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy"
+    data-agent-id="v2_agt_TSs3J5qX"
+    data-name="did-agent"
+    data-monitor="false"
+    data-target-id="did-agent">
   </script>
 </body>
 </html>
