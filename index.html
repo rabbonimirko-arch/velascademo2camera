@@ -1,172 +1,308 @@
 <!doctype html>
 <html lang="it">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Agent PRO</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>D-ID Agent Presence</title>
 
-<style>
-* { margin:0; padding:0; box-sizing:border-box; }
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
 
-html, body {
-  width:100%;
-  height:100%;
-  background:#000;
-  overflow:hidden;
-  font-family:system-ui;
-}
+    html, body {
+      width:100%;
+      height:100%;
+      background:#000;
+      overflow:hidden;
+      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      -webkit-text-size-adjust:100%;
+    }
 
-.stage {
-  width:100vw;
-  height:100vh;
-  display:grid;
-  place-items:center;
-}
+    .stage {
+      width:100vw;
+      height:100vh;
+      display:grid;
+      place-items:center;
+      background:#000;
+    }
 
-.frame {
-  width:min(100vw, calc(100vh * 9 / 16));
-  height:min(100vh, calc(100vw * 16 / 9));
-  position:relative;
-  background:#000;
-}
+    .frame {
+      width:min(100vw, calc(100vh * 9 / 16));
+      height:min(100vh, calc(100vw * 16 / 9));
+      position:relative;
+      overflow:hidden;
+      background:#000;
+    }
 
-/* container agent */
-#agent-container {
-  width:100%;
-  height:100%;
-}
+    #agent-container {
+      width:100%;
+      height:100%;
+      position:relative;
+      z-index:1;
+    }
 
-/* overlay presenza */
-.overlay {
-  position:absolute;
-  inset:0;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:#fff;
-  background:rgba(0,0,0,0.7);
-  text-align:center;
-  z-index:10;
-  font-size:18px;
-  padding:20px;
-  transition:opacity .4s;
-}
+    .overlay {
+      position:absolute;
+      inset:0;
+      z-index:5;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      color:#fff;
+      padding:24px;
+      background:rgba(0,0,0,.78);
+      font-size:18px;
+      line-height:1.4;
+      transition:opacity .35s ease;
+    }
 
-.hidden {
-  opacity:0;
-  pointer-events:none;
-}
-</style>
+    .overlay.hidden {
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .status {
+      position:absolute;
+      left:12px;
+      right:12px;
+      bottom:12px;
+      z-index:6;
+      color:rgba(255,255,255,.9);
+      font-size:13px;
+      text-align:center;
+      padding:8px 10px;
+      border-radius:10px;
+      background:rgba(0,0,0,.45);
+      backdrop-filter:blur(4px);
+    }
+
+    .tapStart {
+      position:absolute;
+      inset:0;
+      z-index:7;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      color:#fff;
+      padding:24px;
+      background:rgba(0,0,0,.82);
+      font-size:20px;
+      line-height:1.4;
+      cursor:pointer;
+    }
+
+    .tapStart.hidden {
+      display:none;
+    }
+
+    video#presenceCam {
+      position:fixed;
+      width:1px;
+      height:1px;
+      opacity:0.001;
+      pointer-events:none;
+      left:-9999px;
+      top:-9999px;
+    }
+
+    canvas#presenceCanvas {
+      position:fixed;
+      width:1px;
+      height:1px;
+      opacity:0.001;
+      pointer-events:none;
+      left:-9999px;
+      top:-9999px;
+    }
+
+    ::-webkit-scrollbar { width:0; height:0; }
+  </style>
 </head>
-
 <body>
+  <div class="stage">
+    <div class="frame">
+      <div id="agent-container"></div>
 
-<div class="stage">
-  <div class="frame">
+      <div class="overlay" id="overlay">
+        Avvicinati per iniziare<br>
+        L’assistente AI si attiverà automaticamente
+      </div>
 
-    <div id="agent-container"></div>
+      <div class="status" id="status">
+        In attesa della fotocamera…
+      </div>
 
-    <div class="overlay" id="overlay">
-      Avvicinati per iniziare<br>
-      L’assistente AI si attiverà automaticamente
+      <div class="tapStart hidden" id="tapStart">
+        Tocca per iniziare la conversazione
+      </div>
     </div>
-
   </div>
-</div>
 
-<!-- 🎥 video invisibile -->
-<video id="cam" autoplay playsinline muted style="display:none"></video>
+  <video id="presenceCam" autoplay playsinline muted></video>
+  <canvas id="presenceCanvas" width="160" height="120"></canvas>
 
-<!-- ✅ D-ID SDK -->
-<script type="module"
-  src="https://agent.d-id.com/v2/index.js"
-  data-mode="full"
-  data-client-key="Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy"
-  data-agent-id="v2_agt_TSs3J5qX"
-  data-name="did-agent"
-  data-monitor="true"
-  data-target-id="agent-container">
-</script>
+  <script>
+    const overlay = document.getElementById('overlay');
+    const statusBox = document.getElementById('status');
+    const tapStart = document.getElementById('tapStart');
+    const cam = document.getElementById('presenceCam');
+    const canvas = document.getElementById('presenceCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-<script>
-// ==========================
-// 🎥 PRESENCE DETECTION
-// ==========================
-const cam = document.getElementById("cam");
-const overlay = document.getElementById("overlay");
+    let presenceStream = null;
+    let detectionRunning = false;
+    let presenceTriggered = false;
+    let lastFrame = null;
+    let stableFrames = 0;
 
-let detected = false;
+    function setStatus(text) {
+      statusBox.textContent = text;
+    }
 
-navigator.mediaDevices.getUserMedia({ video: true })
-.then(stream => {
-  cam.srcObject = stream;
-  detectMotion();
-})
-.catch(() => {
-  console.log("camera non disponibile");
-});
-
-function detectMotion() {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-
-  canvas.width = 160;
-  canvas.height = 120;
-
-  let last = null;
-
-  function scan() {
-    ctx.drawImage(cam, 0, 0, canvas.width, canvas.height);
-    let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    if (last && !detected) {
-      let diff = 0;
-
-      for (let i = 0; i < frame.data.length; i += 4) {
-        diff += Math.abs(frame.data[i] - last.data[i]);
-      }
-
-      if (diff > 50000) {
-        detected = true;
-        startAgent();
+    function requestFs() {
+      const el = document.documentElement;
+      const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+      if (fn) {
+        try { fn.call(el); } catch(e) {}
       }
     }
 
-    last = frame;
-    requestAnimationFrame(scan);
-  }
+    function stopPresenceCamera() {
+      if (presenceStream) {
+        presenceStream.getTracks().forEach(track => track.stop());
+        presenceStream = null;
+      }
+      cam.srcObject = null;
+      detectionRunning = false;
+    }
 
-  scan();
-}
+    async function startPresenceCamera() {
+      try {
+        setStatus('Richiesta accesso alla fotocamera…');
 
-// ==========================
-// 🚀 START AGENT
-// ==========================
-function startAgent() {
+        presenceStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            frameRate: { ideal: 10, max: 15 }
+          },
+          audio: false
+        });
 
-  console.log("utente rilevato");
+        cam.srcObject = presenceStream;
 
-  overlay.classList.add("hidden");
+        await new Promise((resolve) => {
+          if (cam.readyState >= 2) {
+            resolve();
+            return;
+          }
+          cam.onloadedmetadata = () => resolve();
+        });
 
-  // simula click per sbloccare audio/video
-  document.body.click();
+        await cam.play();
 
-  // fullscreen
-  const el = document.documentElement;
-  if (el.requestFullscreen) el.requestFullscreen();
-}
+        detectionRunning = true;
+        setStatus('Rilevamento presenza attivo');
+        requestAnimationFrame(scanMotion);
 
-// ==========================
-// 🔒 BLOCCA ZOOM
-// ==========================
-let lastTouchEnd = 0;
-document.addEventListener('touchend', (event) => {
-  const now = Date.now();
-  if (now - lastTouchEnd <= 300) event.preventDefault();
-  lastTouchEnd = now;
-}, { passive:false });
+      } catch (err) {
+        console.error(err);
+        setStatus('Fotocamera non disponibile. Tocca per iniziare.');
+        tapStart.classList.remove('hidden');
+      }
+    }
 
-</script>
+    function scanMotion() {
+      if (!detectionRunning || presenceTriggered) return;
 
+      if (cam.readyState < 2 || !cam.videoWidth || !cam.videoHeight) {
+        requestAnimationFrame(scanMotion);
+        return;
+      }
+
+      try {
+        ctx.drawImage(cam, 0, 0, canvas.width, canvas.height);
+      } catch (e) {
+        requestAnimationFrame(scanMotion);
+        return;
+      }
+
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+      if (lastFrame) {
+        let diff = 0;
+
+        for (let i = 0; i < frame.length; i += 16) {
+          diff += Math.abs(frame[i] - lastFrame[i]);
+        }
+
+        // soglia più stabile per evitare falsi positivi e blocchi
+        if (diff > 9000) {
+          stableFrames++;
+        } else {
+          stableFrames = 0;
+        }
+
+        if (stableFrames >= 3) {
+          onPresenceDetected();
+          return;
+        }
+      }
+
+      lastFrame = new Uint8ClampedArray(frame);
+      requestAnimationFrame(scanMotion);
+    }
+
+    function onPresenceDetected() {
+      presenceTriggered = true;
+      setStatus('Presenza rilevata');
+      overlay.classList.add('hidden');
+
+      // importantissimo: chiudi la webcam usata per il rilevamento
+      // prima di lasciare la gestione all’agent
+      stopPresenceCamera();
+
+      // fullscreen opzionale
+      requestFs();
+
+      // piccolo delay per lasciare liberare la camera
+      setTimeout(() => {
+        setStatus('Assistente pronto');
+      }, 500);
+    }
+
+    // fallback manuale
+    tapStart.addEventListener('click', () => {
+      tapStart.classList.add('hidden');
+      overlay.classList.add('hidden');
+      presenceTriggered = true;
+      stopPresenceCamera();
+      requestFs();
+      setStatus('Assistente pronto');
+    });
+
+    // blocco doppio tap zoom
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', (event) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) event.preventDefault();
+      lastTouchEnd = now;
+    }, { passive: false });
+
+    startPresenceCamera();
+  </script>
+
+  <script
+    type="module"
+    src="https://agent.d-id.com/v2/index.js"
+    data-mode="full"
+    data-client-key="Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy"
+    data-agent-id="v2_agt_TSs3J5qX"
+    data-name="did-agent"
+    data-monitor="false"
+    data-target-id="agent-container">
+  </script>
 </body>
 </html>
