@@ -38,6 +38,7 @@
       height:100%;
       position:relative;
       z-index:1;
+      background:#000;
     }
 
     .overlay {
@@ -50,9 +51,9 @@
       text-align:center;
       color:#fff;
       padding:24px;
-      background:rgba(0,0,0,.78);
+      background:rgba(0,0,0,.82);
       font-size:18px;
-      line-height:1.4;
+      line-height:1.45;
       transition:opacity .35s ease;
     }
 
@@ -67,7 +68,7 @@
       right:12px;
       bottom:12px;
       z-index:6;
-      color:rgba(255,255,255,.9);
+      color:rgba(255,255,255,.92);
       font-size:13px;
       text-align:center;
       padding:8px 10px;
@@ -80,32 +81,23 @@
       position:absolute;
       inset:0;
       z-index:7;
-      display:flex;
+      display:none;
       align-items:center;
       justify-content:center;
       text-align:center;
       color:#fff;
       padding:24px;
-      background:rgba(0,0,0,.82);
+      background:rgba(0,0,0,.85);
       font-size:20px;
       line-height:1.4;
       cursor:pointer;
     }
 
-    .tapStart.hidden {
-      display:none;
+    .tapStart.show {
+      display:flex;
     }
 
-    video#presenceCam {
-      position:fixed;
-      width:1px;
-      height:1px;
-      opacity:0.001;
-      pointer-events:none;
-      left:-9999px;
-      top:-9999px;
-    }
-
+    video#presenceCam,
     canvas#presenceCanvas {
       position:fixed;
       width:1px;
@@ -129,12 +121,10 @@
         L’assistente AI si attiverà automaticamente
       </div>
 
-      <div class="status" id="status">
-        In attesa della fotocamera…
-      </div>
+      <div class="status" id="status">Avvio rilevamento presenza…</div>
 
-      <div class="tapStart hidden" id="tapStart">
-        Tocca per iniziare la conversazione
+      <div class="tapStart" id="tapStart">
+        Tocca per avviare l’assistente
       </div>
     </div>
   </div>
@@ -152,7 +142,8 @@
 
     let presenceStream = null;
     let detectionRunning = false;
-    let presenceTriggered = false;
+    let detected = false;
+    let agentLoaded = false;
     let lastFrame = null;
     let stableFrames = 0;
 
@@ -169,12 +160,12 @@
     }
 
     function stopPresenceCamera() {
+      detectionRunning = false;
       if (presenceStream) {
         presenceStream.getTracks().forEach(track => track.stop());
         presenceStream = null;
       }
       cam.srcObject = null;
-      detectionRunning = false;
     }
 
     async function startPresenceCamera() {
@@ -193,11 +184,8 @@
 
         cam.srcObject = presenceStream;
 
-        await new Promise((resolve) => {
-          if (cam.readyState >= 2) {
-            resolve();
-            return;
-          }
+        await new Promise(resolve => {
+          if (cam.readyState >= 2) return resolve();
           cam.onloadedmetadata = () => resolve();
         });
 
@@ -209,13 +197,13 @@
 
       } catch (err) {
         console.error(err);
-        setStatus('Fotocamera non disponibile. Tocca per iniziare.');
-        tapStart.classList.remove('hidden');
+        setStatus('Fotocamera non disponibile. Tocca per avviare.');
+        tapStart.classList.add('show');
       }
     }
 
     function scanMotion() {
-      if (!detectionRunning || presenceTriggered) return;
+      if (!detectionRunning || detected) return;
 
       if (cam.readyState < 2 || !cam.videoWidth || !cam.videoHeight) {
         requestAnimationFrame(scanMotion);
@@ -238,7 +226,6 @@
           diff += Math.abs(frame[i] - lastFrame[i]);
         }
 
-        // soglia più stabile per evitare falsi positivi e blocchi
         if (diff > 9000) {
           stableFrames++;
         } else {
@@ -255,35 +242,61 @@
       requestAnimationFrame(scanMotion);
     }
 
+    function loadDidAgent() {
+      if (agentLoaded) return;
+      agentLoaded = true;
+
+      setStatus('Caricamento assistente…');
+
+      const script = document.createElement('script');
+      script.type = 'module';
+      script.src = 'https://agent.d-id.com/v2/index.js';
+      script.setAttribute('data-mode', 'full');
+      script.setAttribute('data-client-key', 'Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy');
+      script.setAttribute('data-agent-id', 'v2_agt_TSs3J5qX');
+      script.setAttribute('data-name', 'did-agent');
+      script.setAttribute('data-monitor', 'false');
+      script.setAttribute('data-target-id', 'agent-container');
+
+      script.onload = () => {
+        setStatus('Assistente pronto');
+      };
+
+      script.onerror = () => {
+        setStatus('Errore nel caricamento D-ID');
+        tapStart.classList.add('show');
+      };
+
+      document.body.appendChild(script);
+
+      setTimeout(() => {
+        if (statusBox.textContent === 'Caricamento assistente…') {
+          setStatus('L’assistente sta impiegando più tempo del previsto');
+        }
+      }, 12000);
+    }
+
     function onPresenceDetected() {
-      presenceTriggered = true;
+      detected = true;
       setStatus('Presenza rilevata');
       overlay.classList.add('hidden');
 
-      // importantissimo: chiudi la webcam usata per il rilevamento
-      // prima di lasciare la gestione all’agent
       stopPresenceCamera();
 
-      // fullscreen opzionale
-      requestFs();
-
-      // piccolo delay per lasciare liberare la camera
       setTimeout(() => {
-        setStatus('Assistente pronto');
-      }, 500);
+        requestFs();
+        loadDidAgent();
+      }, 700);
     }
 
-    // fallback manuale
     tapStart.addEventListener('click', () => {
-      tapStart.classList.add('hidden');
       overlay.classList.add('hidden');
-      presenceTriggered = true;
-      stopPresenceCamera();
       requestFs();
-      setStatus('Assistente pronto');
+      stopPresenceCamera();
+      loadDidAgent();
+      tapStart.classList.remove('show');
     });
 
-    // blocco doppio tap zoom
     let lastTouchEnd = 0;
     document.addEventListener('touchend', (event) => {
       const now = Date.now();
@@ -292,17 +305,6 @@
     }, { passive: false });
 
     startPresenceCamera();
-  </script>
-
-  <script
-    type="module"
-    src="https://agent.d-id.com/v2/index.js"
-    data-mode="full"
-    data-client-key="Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy"
-    data-agent-id="v2_agt_TSs3J5qX"
-    data-name="did-agent"
-    data-monitor="false"
-    data-target-id="agent-container">
   </script>
 </body>
 </html>
