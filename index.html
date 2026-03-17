@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>AI Agent Smart Presence</title>
+<title>AI Agent PRO</title>
 
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -27,36 +27,27 @@ html, body {
   width:min(100vw, calc(100vh * 9 / 16));
   height:min(100vh, calc(100vw * 16 / 9));
   position:relative;
+  background:#000;
 }
 
-iframe {
+/* container agent */
+#agent-container {
   width:100%;
   height:100%;
-  border:0;
-}
-
-.loading {
-  position:absolute;
-  inset:0;
-  display:grid;
-  place-items:center;
-  color:#fff;
-  background:rgba(0,0,0,0.8);
-  z-index:2;
 }
 
 /* overlay presenza */
-.presenceOverlay {
+.overlay {
   position:absolute;
   inset:0;
   display:flex;
   align-items:center;
   justify-content:center;
   color:#fff;
-  background:rgba(0,0,0,0.6);
-  z-index:3;
-  font-size:18px;
+  background:rgba(0,0,0,0.7);
   text-align:center;
+  z-index:10;
+  font-size:18px;
   padding:20px;
   transition:opacity .4s;
 }
@@ -73,107 +64,100 @@ iframe {
 <div class="stage">
   <div class="frame">
 
-    <div class="loading" id="loading">Caricamento…</div>
+    <div id="agent-container"></div>
 
-    <div class="presenceOverlay" id="presence">
+    <div class="overlay" id="overlay">
       Avvicinati per iniziare<br>
       L’assistente AI si attiverà automaticamente
     </div>
 
-    <iframe
-      id="agentFrame"
-      allow="camera; microphone; autoplay"
-      src="https://studio.d-id.com/agents/share?id=v2_agt_TSs3J5qX&utm_source=copy"
-    ></iframe>
-
   </div>
 </div>
 
+<!-- 🎥 video invisibile -->
+<video id="cam" autoplay playsinline muted style="display:none"></video>
+
+<!-- ✅ D-ID SDK -->
+<script type="module"
+  src="https://agent.d-id.com/v2/index.js"
+  data-mode="full"
+  data-client-key="Z29vZ2xlLW9hdXRoMnwxMTgyMzY0ODQ3MTYxODA2NDM0Mjk6SkNJemxyN2FsYmhFR1Q3WmxOMVRy"
+  data-agent-id="v2_agt_TSs3J5qX"
+  data-name="did-agent"
+  data-monitor="true"
+  data-target-id="agent-container">
+</script>
+
 <script>
-const frame = document.getElementById('agentFrame');
-const loading = document.getElementById('loading');
-const overlay = document.getElementById('presence');
-
-frame.onload = () => loading.style.display = "none";
-
 // ==========================
 // 🎥 PRESENCE DETECTION
 // ==========================
-let video = document.createElement('video');
-let canvas = document.createElement('canvas');
-let ctx = canvas.getContext('2d');
+const cam = document.getElementById("cam");
+const overlay = document.getElementById("overlay");
 
-let lastFrame = null;
-let presenceDetected = false;
+let detected = false;
 
 navigator.mediaDevices.getUserMedia({ video: true })
 .then(stream => {
-  video.srcObject = stream;
-  video.play();
+  cam.srcObject = stream;
   detectMotion();
 })
-.catch(err => {
-  console.log("Camera non disponibile", err);
+.catch(() => {
+  console.log("camera non disponibile");
 });
 
-// Motion detection semplice
 function detectMotion() {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
   canvas.width = 160;
   canvas.height = 120;
 
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  let currentFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let last = null;
 
-  if (lastFrame) {
-    let diff = 0;
+  function scan() {
+    ctx.drawImage(cam, 0, 0, canvas.width, canvas.height);
+    let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    for (let i = 0; i < currentFrame.data.length; i += 4) {
-      diff += Math.abs(currentFrame.data[i] - lastFrame.data[i]);
+    if (last && !detected) {
+      let diff = 0;
+
+      for (let i = 0; i < frame.data.length; i += 4) {
+        diff += Math.abs(frame.data[i] - last.data[i]);
+      }
+
+      if (diff > 50000) {
+        detected = true;
+        startAgent();
+      }
     }
 
-    if (diff > 50000 && !presenceDetected) {
-      presenceDetected = true;
-      onPresenceDetected();
-    }
+    last = frame;
+    requestAnimationFrame(scan);
   }
 
-  lastFrame = currentFrame;
-  requestAnimationFrame(detectMotion);
+  scan();
 }
 
 // ==========================
-// 🚀 ACTION ON PRESENCE
+// 🚀 START AGENT
 // ==========================
-function onPresenceDetected() {
+function startAgent() {
 
-  console.log("Presenza rilevata");
+  console.log("utente rilevato");
 
-  // nascondi overlay
   overlay.classList.add("hidden");
 
-  // simula interazione utente per sbloccare audio/video
+  // simula click per sbloccare audio/video
   document.body.click();
 
-  // prova fullscreen
-  requestFullscreen();
-
-  // OPTIONAL: refresh iframe per auto start sessione
-  // (utile per D-ID che richiede user gesture)
-  setTimeout(() => {
-    frame.contentWindow.postMessage("start", "*");
-  }, 1000);
-}
-
-// ==========================
-// FULLSCREEN
-// ==========================
-function requestFullscreen() {
+  // fullscreen
   const el = document.documentElement;
   if (el.requestFullscreen) el.requestFullscreen();
 }
 
 // ==========================
-// BLOCCA ZOOM
+// 🔒 BLOCCA ZOOM
 // ==========================
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (event) => {
